@@ -1,0 +1,68 @@
+import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+
+const FREE_TIER_DAILY_LIMIT = 5
+
+export async function POST(req: Request) {
+  const { slug, clientName, clientEmail, startTime, endTime, notes } = await req.json()
+
+  const bookingPage = await prisma.bookingPage.findUnique({
+    where: { slug, isActive: true },
+    include: { user: { select: { tier: true } } },
+  })
+
+  if (!bookingPage) {
+    return NextResponse.json({ error: "Booking page not found." }, { status: 404 })
+  }
+
+  if (bookingPage.user.tier === "FREE") {
+    const todayStart = new Date(startTime)
+    todayStart.setUTCHours(0, 0, 0, 0)
+    const todayEnd = new Date(startTime)
+    todayEnd.setUTCHours(23, 59, 59, 999)
+
+    const todayCount = await prisma.appointment.count({
+      where: {
+        bookingPageId: bookingPage.id,
+        status: { in: ["PENDING", "CONFIRMED"] },
+        startTime: { gte: todayStart, lte: todayEnd },
+      },
+    })
+
+    if (todayCount >= FREE_TIER_DAILY_LIMIT) {
+      return NextResponse.json(
+        { error: "This provider has reached their daily booking limit." },
+        { status: 429 }
+      )
+    }
+  }
+
+  const conflict = await prisma.appointment.findFirst({
+    where: {
+      bookingPageId: bookingPage.id,
+      status: { in: ["PENDING", "CONFIRMED"] },
+      OR: [
+        { startTime: { lt: new Date(endTime), gte: new Date(startTime) } },
+        { endTime: { gt: new Date(startTime), lte: new Date(endTime) } },
+      ],
+    },
+  })
+
+  if (conflict) {
+    return NextResponse.json({ error: "Slot no longer available." }, { status: 409 })
+  }
+
+  const appointment = await prisma.appointment.create({
+    data: {
+      bookingPageId: bookingPage.id,
+      clientName,
+      clientEmail,
+      startTime: new Date(startTime),
+      endTime: new Date(endTime),
+      notes: notes ?? null,
+      status: bookingPage.price ? "PENDING" : "CONFIRMED",
+    },
+  })
+
+  return NextResponse.json(appointment, { status: 201 })
+}
