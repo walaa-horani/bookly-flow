@@ -1,0 +1,202 @@
+// prisma/schema.prisma
+// Connection URL is managed via prisma.config.ts (Prisma 7 pattern)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth.js v5 required models ───────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Provider (SaaS customer) ─────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // bcrypt hash; null for OAuth-only accounts
+
+  tier Tier @default(FREE)
+
+  accounts     Account[]
+  sessions     Session[]
+  bookingPage  BookingPage?
+  subscription Subscription?
+  fcmTokens    FcmToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+enum Tier {
+  FREE
+  PRO
+}
+
+// ─── Booking page (one per Provider) ─────────────────────────────────────────
+
+model BookingPage {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  slug        String   @unique   // URL-safe: /book/<slug>
+  title       String
+  description String?  @db.Text
+  duration    Int      @default(30) // minutes per slot
+  price       Decimal? @db.Decimal(10, 2) // null = free session
+  currency    String   @default("USD")
+  isActive    Boolean  @default(true)
+
+  // Pro-tier branding (rendered only when tier === PRO)
+  brandColor String?
+  logoUrl    String?
+
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availability Availability[]
+  appointments Appointment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("booking_pages")
+}
+
+// ─── Weekly recurring availability ───────────────────────────────────────────
+
+model Availability {
+  id            String  @id @default(cuid())
+  bookingPageId String
+  dayOfWeek     Int     // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+  startTime     String  // "09:00" 24-hour
+  endTime       String  // "17:00" 24-hour
+  isActive      Boolean @default(true)
+
+  bookingPage BookingPage @relation(fields: [bookingPageId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingPageId, dayOfWeek])
+  @@map("availability")
+}
+
+// ─── Appointment (one booking by a Client) ───────────────────────────────────
+
+model Appointment {
+  id            String            @id @default(cuid())
+  bookingPageId String
+  clientName    String
+  clientEmail   String
+  startTime     DateTime
+  endTime       DateTime
+  status        AppointmentStatus @default(PENDING)
+  notes         String?           @db.Text
+
+  // Populated by Paddle webhook after successful B2C payment
+  paddleTransactionId String?
+  amountPaid          Decimal? @db.Decimal(10, 2)
+
+  bookingPage BookingPage @relation(fields: [bookingPageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bookingPageId, startTime])
+  @@index([bookingPageId, status])
+  @@map("appointments")
+}
+
+enum AppointmentStatus {
+  PENDING    // awaiting payment (paid session) or just created (free session, auto-confirmed)
+  CONFIRMED  // payment received OR free session auto-confirmed
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+// ─── Paddle B2B subscription (Provider → Pro) ────────────────────────────────
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  paddleSubscriptionId String             @unique
+  paddlePriceId        String
+  status               SubscriptionStatus
+  currentPeriodStart   DateTime
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean            @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+  PAUSED
+}
+
+// ─── Firebase Cloud Messaging tokens ─────────────────────────────────────────
+
+model FcmToken {
+  id        String  @id @default(cuid())
+  userId    String
+  token     String  @unique
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@map("fcm_tokens")
+}
