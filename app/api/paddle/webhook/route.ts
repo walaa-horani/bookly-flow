@@ -1,0 +1,147 @@
+import { NextResponse } from "next/server"
+import { paddle } from "@/lib/paddle"
+import { prisma } from "@/lib/prisma"
+import { sendBookingConfirmedNotification } from "@/lib/firebase-admin"
+import type {
+  EventName,
+  SubscriptionActivatedEvent,
+  SubscriptionCanceledEvent,
+  SubscriptionPausedEvent,
+  SubscriptionResumedEvent,
+  TransactionCompletedEvent,
+} from "@paddle/paddle-node-sdk"
+
+export async function POST(req: Request) {
+  const signature = req.headers.get("paddle-signature") ?? ""
+  const rawBody = await req.text()
+
+  let event
+  try {
+    event = paddle.webhooks.unmarshal(rawBody, process.env.PADDLE_WEBHOOK_SECRET!, signature)
+  } catch {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
+  }
+
+  if (!event) {
+    return NextResponse.json({ error: "Unknown event" }, { status: 400 })
+  }
+
+  try {
+    switch (event.eventType as EventName) {
+      case "transaction.completed": {
+        const data = event.data as TransactionCompletedEvent["data"]
+        const customData = data.customData as Record<string, string> | null
+
+        if (customData?.type === "booking_payment" && customData?.appointmentId) {
+          const amount = data.details?.totals?.total
+            ? Number(data.details.totals.total) / 100
+            : null
+
+          const appointment = await prisma.appointment.update({
+            where: { id: customData.appointmentId },
+            data: {
+              status: "CONFIRMED",
+              paddleTransactionId: data.id,
+              amountPaid: amount,
+            },
+            include: {
+              bookingPage: {
+                include: {
+                  user: { include: { fcmTokens: true } },
+                },
+              },
+            },
+          })
+
+          const tokens = appointment.bookingPage.user.fcmTokens.map((t) => t.token)
+          if (tokens.length > 0) {
+            await sendBookingConfirmedNotification(tokens, {
+              clientName: appointment.clientName,
+              startTime: appointment.startTime.toISOString(),
+            })
+          }
+        }
+        break
+      }
+
+      case "subscription.activated": {
+        const data = event.data as SubscriptionActivatedEvent["data"]
+        const customData = data.customData as Record<string, string> | null
+        const userId = customData?.userId
+
+        if (userId) {
+          await prisma.$transaction([
+            prisma.user.update({
+              where: { id: userId },
+              data: { tier: "PRO" },
+            }),
+            prisma.subscription.upsert({
+              where: { userId },
+              update: {
+                paddleSubscriptionId: data.id,
+                paddlePriceId: data.items[0]?.price?.id ?? "",
+                status: "ACTIVE",
+                currentPeriodStart: new Date(data.currentBillingPeriod?.startsAt ?? Date.now()),
+                currentPeriodEnd: new Date(data.currentBillingPeriod?.endsAt ?? Date.now()),
+                cancelAtPeriodEnd: false,
+              },
+              create: {
+                userId,
+                paddleSubscriptionId: data.id,
+                paddlePriceId: data.items[0]?.price?.id ?? "",
+                status: "ACTIVE",
+                currentPeriodStart: new Date(data.currentBillingPeriod?.startsAt ?? Date.now()),
+                currentPeriodEnd: new Date(data.currentBillingPeriod?.endsAt ?? Date.now()),
+              },
+            }),
+          ])
+        }
+        break
+      }
+
+      case "subscription.canceled": {
+        const data = event.data as SubscriptionCanceledEvent["data"]
+        await prisma.subscription.updateMany({
+          where: { paddleSubscriptionId: data.id },
+          data: { status: "CANCELED" },
+        })
+        const sub = await prisma.subscription.findUnique({
+          where: { paddleSubscriptionId: data.id },
+        })
+        if (sub) {
+          await prisma.user.update({
+            where: { id: sub.userId },
+            data: { tier: "FREE" },
+          })
+        }
+        break
+      }
+
+      case "subscription.paused": {
+        const data = event.data as SubscriptionPausedEvent["data"]
+        await prisma.subscription.updateMany({
+          where: { paddleSubscriptionId: data.id },
+          data: { status: "PAUSED" },
+        })
+        break
+      }
+
+      case "subscription.resumed": {
+        const data = event.data as SubscriptionResumedEvent["data"]
+        await prisma.subscription.updateMany({
+          where: { paddleSubscriptionId: data.id },
+          data: { status: "ACTIVE" },
+        })
+        break
+      }
+
+      default:
+        break
+    }
+  } catch (err) {
+    console.error("Webhook processing error:", err)
+    return NextResponse.json({ error: "Internal error" }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true })
+}
