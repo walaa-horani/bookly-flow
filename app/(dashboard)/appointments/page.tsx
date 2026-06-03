@@ -1,27 +1,19 @@
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+// app/(dashboard)/appointments/page.tsx
+import { requireOrgContext } from "@/lib/org-context"
+import { listOrgAppointments } from "@/lib/data/appointments"
 import { AppointmentsTable } from "@/components/dashboard/appointments-table"
 
 export default async function AppointmentsPage() {
-  const session = await auth()
-
-  const bookingPage = await prisma.bookingPage.findUnique({
-    where: { userId: session!.user.id },
-    include: {
-      appointments: {
-        orderBy: { startTime: "desc" },
-        take: 100,
-      },
-    },
-  })
+  const ctx = await requireOrgContext()
+  const appointments = await listOrgAppointments(ctx.orgId)
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Appointments</h1>
-      {!bookingPage ? (
-        <p className="text-muted-foreground">Create a booking page first.</p>
+      {appointments.length === 0 ? (
+        <p className="text-muted-foreground">No appointments yet.</p>
       ) : (
-        <AppointmentsTable appointments={bookingPage.appointments} />
+        <AppointmentsTable appointments={appointments} />
       )}
     </div>
   )
