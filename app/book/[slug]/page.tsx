@@ -1,4 +1,5 @@
-import { prisma } from "@/lib/prisma"
+// app/book/[slug]/page.tsx
+import { getActiveBookingPageBySlug } from "@/lib/data/public/booking"
 import { BookingPageView } from "@/components/booking/booking-page-view"
 import { notFound } from "next/navigation"
 
@@ -9,20 +10,12 @@ export default async function PublicBookingPage({
 }) {
   const { slug } = await params
 
-  const page = await prisma.bookingPage.findUnique({
-    where: { slug, isActive: true },
-    select: {
-      slug: true,
-      title: true,
-      description: true,
-      duration: true,
-      brandColor: true,
-      logoUrl: true,
-      user: { select: { tier: true } },
-    },
-  })
+  const page = await getActiveBookingPageBySlug(slug)
 
   if (!page) notFound()
+
+  // Tier comes from org (post-migration) or user (pre-migration fallback)
+  const tier = page.org?.tier ?? page.user?.tier ?? "FREE"
 
   return (
     <BookingPageView
@@ -31,8 +24,8 @@ export default async function PublicBookingPage({
         title: page.title,
         description: page.description,
         duration: page.duration,
-        brandColor: page.user.tier === "PRO" ? page.brandColor : null,
-        logoUrl: page.user.tier === "PRO" ? page.logoUrl : null,
+        brandColor: tier === "PRO" ? page.brandColor : null,
+        logoUrl: tier === "PRO" ? page.logoUrl : null,
       }}
     />
   )

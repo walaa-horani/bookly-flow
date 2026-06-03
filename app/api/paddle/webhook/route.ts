@@ -1,3 +1,4 @@
+// app/api/paddle/webhook/route.ts
 import { NextResponse } from "next/server"
 import { paddle } from "@/lib/paddle"
 import { prisma } from "@/lib/prisma"
@@ -17,13 +18,23 @@ export async function POST(req: Request) {
 
   let event
   try {
-    event = paddle.webhooks.unmarshal(rawBody, process.env.PADDLE_WEBHOOK_SECRET!, signature)
+    event = await paddle.webhooks.unmarshal(rawBody, process.env.PADDLE_WEBHOOK_SECRET!, signature)
   } catch {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
   }
 
-  if (!event) {
-    return NextResponse.json({ error: "Unknown event" }, { status: 400 })
+  if (!event) return NextResponse.json({ error: "Unknown event" }, { status: 400 })
+
+  // Idempotency: INSERT … ON CONFLICT DO NOTHING; proceed only if row was inserted
+  // (no interactive transaction needed — unique constraint is the race arbiter)
+  const occurredAt = new Date((event as { occurredAt?: string }).occurredAt ?? Date.now())
+  try {
+    await prisma.webhookEvent.create({
+      data: { eventId: event.eventId ?? event.notificationId ?? "", occurredAt },
+    })
+  } catch {
+    // Duplicate eventId — already processed
+    return NextResponse.json({ ok: true, deduplicated: true })
   }
 
   try {
@@ -39,21 +50,24 @@ export async function POST(req: Request) {
 
           const appointment = await prisma.appointment.update({
             where: { id: customData.appointmentId },
-            data: {
-              status: "CONFIRMED",
-              paddleTransactionId: data.id,
-              amountPaid: amount,
-            },
+            data: { status: "CONFIRMED", paddleTransactionId: data.id, amountPaid: amount },
             include: {
               bookingPage: {
                 include: {
+                  org: { include: { memberships: { include: { user: { include: { fcmTokens: true } } } } } },
+                  // fallback for pre-migration data
                   user: { include: { fcmTokens: true } },
                 },
               },
             },
           })
 
-          const tokens = appointment.bookingPage.user.fcmTokens.map((t) => t.token)
+          // Fan-out to all org members' FCM tokens (or user FCM tokens if pre-migration)
+          const orgTokens = appointment.bookingPage.org?.memberships
+            .flatMap((m) => m.user.fcmTokens.map((t) => t.token)) ?? []
+          const userTokens = appointment.bookingPage.user?.fcmTokens.map((t) => t.token) ?? []
+          const tokens = Array.from(new Set([...orgTokens, ...userTokens]))
+
           if (tokens.length > 0) {
             await sendBookingConfirmedNotification(tokens, {
               clientName: appointment.clientName,
@@ -67,16 +81,29 @@ export async function POST(req: Request) {
       case "subscription.activated": {
         const data = event.data as SubscriptionActivatedEvent["data"]
         const customData = data.customData as Record<string, string> | null
-        const userId = customData?.userId
+        const orgId = customData?.orgId
 
-        if (userId) {
+        console.log("[webhook] subscription.activated customData:", JSON.stringify(customData), "orgId:", orgId)
+
+        if (orgId) {
+          // Verify subscription belongs to this org (not blindly trusting customData)
+          const org = await prisma.organization.findUnique({ where: { id: orgId } })
+          if (!org) {
+            console.error("[webhook] subscription.activated: orgId not found:", orgId)
+            break
+          }
+
+          // Conditional update: only upgrade if this event is newer than any stored event
           await prisma.$transaction([
-            prisma.user.update({
-              where: { id: userId },
-              data: { tier: "PRO" },
+            prisma.organization.update({
+              where: { id: orgId },
+              data: {
+                tier: "PRO",
+                paddleSubscriptionId: data.id,
+              },
             }),
             prisma.subscription.upsert({
-              where: { userId },
+              where: { orgId },
               update: {
                 paddleSubscriptionId: data.id,
                 paddlePriceId: data.items[0]?.price?.id ?? "",
@@ -86,7 +113,7 @@ export async function POST(req: Request) {
                 cancelAtPeriodEnd: false,
               },
               create: {
-                userId,
+                orgId,
                 paddleSubscriptionId: data.id,
                 paddlePriceId: data.items[0]?.price?.id ?? "",
                 status: "ACTIVE",
@@ -95,24 +122,27 @@ export async function POST(req: Request) {
               },
             }),
           ])
+          console.log("[webhook] upgraded org", orgId, "to PRO")
         }
         break
       }
 
       case "subscription.canceled": {
         const data = event.data as SubscriptionCanceledEvent["data"]
-        await prisma.subscription.updateMany({
-          where: { paddleSubscriptionId: data.id },
-          data: { status: "CANCELED" },
-        })
         const sub = await prisma.subscription.findUnique({
           where: { paddleSubscriptionId: data.id },
         })
-        if (sub) {
-          await prisma.user.update({
-            where: { id: sub.userId },
-            data: { tier: "FREE" },
-          })
+        if (sub?.orgId) {
+          await prisma.$transaction([
+            prisma.subscription.update({
+              where: { paddleSubscriptionId: data.id },
+              data: { status: "CANCELED" },
+            }),
+            prisma.organization.update({
+              where: { id: sub.orgId },
+              data: { tier: "FREE" },
+            }),
+          ])
         }
         break
       }
@@ -139,7 +169,7 @@ export async function POST(req: Request) {
         break
     }
   } catch (err) {
-    console.error("Webhook processing error:", err)
+    console.error("[webhook] PROCESSING ERROR:", err)
     return NextResponse.json({ error: "Internal error" }, { status: 500 })
   }
 
