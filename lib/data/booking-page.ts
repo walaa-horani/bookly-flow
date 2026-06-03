@@ -40,3 +40,14 @@ export async function getBookingPageWithAvailability(orgId: string) {
     include: { availability: { orderBy: { dayOfWeek: "asc" } } },
   })
 }
+
+export async function getBookingPageWithCount(orgId: string) {
+  return prisma.bookingPage.findUnique({
+    where: { orgId },
+    include: { _count: { select: { appointments: true } } },
+  })
+}
+
+export async function getBookingPageBySlug(slug: string) {
+  return prisma.bookingPage.findUnique({ where: { slug } })
+}

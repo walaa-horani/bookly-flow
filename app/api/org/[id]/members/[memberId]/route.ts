@@ -1,8 +1,6 @@
-// app/api/org/[id]/members/[memberId]/route.ts
 import { NextResponse } from "next/server"
 import { requireOwner } from "@/lib/org-context"
-import { removeMember, updateMemberRole, countOwners } from "@/lib/data/membership"
-import { prisma } from "@/lib/prisma"
+import { removeMember, updateMemberRole, countOwners, getMembershipById } from "@/lib/data/membership"
 
 export async function DELETE(
   _req: Request,
@@ -12,9 +10,7 @@ export async function DELETE(
   const { id, memberId } = await params
   if (ctx.orgId !== id) return NextResponse.json({ error: "Not found." }, { status: 404 })
 
-  const target = await prisma.membership.findUnique({
-    where: { id: memberId, orgId: id },
-  })
+  const target = await getMembershipById(memberId, id)
   if (!target) return NextResponse.json({ error: "Member not found." }, { status: 404 })
 
   // Last-owner protection
@@ -47,9 +43,7 @@ export async function PATCH(
 
   // Last-owner protection when demoting
   if (role === "MEMBER") {
-    const target = await prisma.membership.findUnique({
-      where: { id: memberId, orgId: id },
-    })
+    const target = await getMembershipById(memberId, id)
     if (!target) return NextResponse.json({ error: "Member not found." }, { status: 404 })
 
     if (target.role === "OWNER") {

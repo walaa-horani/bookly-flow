@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { generateSlots } from "@/lib/slots"
+import { getBookingPageWithDayAvailability } from "@/lib/data/public/booking"
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -14,12 +15,7 @@ export async function GET(req: Request) {
   const date = new Date(dateParam + "T00:00:00.000Z")
   const dayOfWeek = date.getUTCDay()
 
-  const bookingPage = await prisma.bookingPage.findUnique({
-    where: { slug, isActive: true },
-    include: {
-      availability: { where: { dayOfWeek, isActive: true } },
-    },
-  })
+  const bookingPage = await getBookingPageWithDayAvailability(slug, dayOfWeek)
 
   if (!bookingPage) {
     return NextResponse.json({ error: "Booking page not found" }, { status: 404 })

@@ -60,9 +60,6 @@ model User {
   image         String?
   password      String?
 
-  // kept during migration; removed in Task 17 finalize push
-  tier Tier @default(FREE)
-
   // new org fields
   accountType AccountType @default(PROVIDER)
   activeOrgId String?
@@ -72,19 +69,10 @@ model User {
   memberships  Membership[]
   fcmTokens    FcmToken[]
 
-  // kept during migration; removed in Task 17 finalize push
-  bookingPage  BookingPage?  @relation("UserBookingPage")
-  subscription Subscription? @relation("UserSubscription")
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
-}
-
-enum Tier {
-  FREE
-  PRO
 }
 
 enum AccountType {
@@ -117,6 +105,11 @@ model Organization {
   @@map("organizations")
 }
 
+enum Tier {
+  FREE
+  PRO
+}
+
 model Membership {
   id     String @id @default(cuid())
   userId String
@@ -138,10 +131,7 @@ model Membership {
 
 model BookingPage {
   id          String   @id @default(cuid())
-  // kept during migration (removed in Task 17)
-  userId      String?  @unique
-  // new org FK (nullable until migration, required after Task 17)
-  orgId       String?  @unique
+  orgId       String   @unique
   slug        String   @unique
   title       String
   description String?  @db.Text
@@ -152,8 +142,7 @@ model BookingPage {
   brandColor  String?
   logoUrl     String?
 
-  user         User?         @relation("UserBookingPage", fields: [userId], references: [id], onDelete: Cascade)
-  org          Organization? @relation("OrgBookingPage", fields: [orgId], references: [id], onDelete: Cascade)
+  org          Organization @relation("OrgBookingPage", fields: [orgId], references: [id], onDelete: Cascade)
   availability Availability[]
   appointments Appointment[]
 
@@ -216,10 +205,7 @@ enum AppointmentStatus {
 
 model Subscription {
   id                   String             @id @default(cuid())
-  // kept during migration (removed in Task 17)
-  userId               String?            @unique
-  // new org FK (nullable until migration, required after Task 17)
-  orgId                String?            @unique
+  orgId                String             @unique
   paddleSubscriptionId String             @unique
   paddlePriceId        String
   status               SubscriptionStatus
@@ -227,8 +213,7 @@ model Subscription {
   currentPeriodEnd     DateTime
   cancelAtPeriodEnd    Boolean            @default(false)
 
-  user User?         @relation("UserSubscription", fields: [userId], references: [id], onDelete: Cascade)
-  org  Organization? @relation("OrgSubscription", fields: [orgId], references: [id], onDelete: Cascade)
+  org Organization @relation("OrgSubscription", fields: [orgId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

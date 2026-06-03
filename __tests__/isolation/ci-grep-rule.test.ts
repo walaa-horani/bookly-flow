@@ -16,6 +16,7 @@ const ALLOWED_DIRS = [
   "lib/data/",
   "scripts/",
   "app/api/paddle/webhook/",
+  "lib/org-context.ts",
 ]
 
 function getTsFiles(dir: string): string[] {

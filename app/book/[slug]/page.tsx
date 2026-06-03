@@ -14,8 +14,8 @@ export default async function PublicBookingPage({
 
   if (!page) notFound()
 
-  // Tier comes from org (post-migration) or user (pre-migration fallback)
-  const tier = page.org?.tier ?? page.user?.tier ?? "FREE"
+  // Tier comes from organization
+  const tier = page.org.tier
 
   return (
     <BookingPageView

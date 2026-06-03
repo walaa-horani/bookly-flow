@@ -7,8 +7,6 @@ export async function getActiveBookingPageBySlug(slug: string) {
     where: { slug, isActive: true },
     include: {
       org: { select: { tier: true } },
-      // fallback for pre-migration rows
-      user: { select: { tier: true } },
     },
   })
 }
@@ -17,5 +15,14 @@ export async function getBookingPageWithSlots(slug: string) {
   return prisma.bookingPage.findUnique({
     where: { slug, isActive: true },
     include: { availability: true },
+  })
+}
+
+export async function getBookingPageWithDayAvailability(slug: string, dayOfWeek: number) {
+  return prisma.bookingPage.findUnique({
+    where: { slug, isActive: true },
+    include: {
+      availability: { where: { dayOfWeek, isActive: true } },
+    },
   })
 }

@@ -1,6 +1,7 @@
 // app/(dashboard)/dashboard/page.tsx
 import { requireOrgContext } from "@/lib/org-context"
-import { prisma } from "@/lib/prisma"
+import { getBookingPageWithCount } from "@/lib/data/booking-page"
+import { countTodayAppointments } from "@/lib/data/appointments"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { buttonVariants } from "@/components/ui/button"
@@ -14,24 +15,10 @@ export default async function DashboardPage({
 }) {
   const ctx = await requireOrgContext()
 
-  const bookingPage = await prisma.bookingPage.findUnique({
-    where: { orgId: ctx.orgId },
-    include: { _count: { select: { appointments: true } } },
-  })
-
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date()
-  todayEnd.setHours(23, 59, 59, 999)
+  const bookingPage = await getBookingPageWithCount(ctx.orgId)
 
   const todayCount = bookingPage
-    ? await prisma.appointment.count({
-        where: {
-          bookingPageId: bookingPage.id,
-          startTime: { gte: todayStart, lte: todayEnd },
-          status: { in: ["PENDING", "CONFIRMED"] },
-        },
-      })
+    ? await countTodayAppointments(bookingPage.id, new Date())
     : 0
 
   const resolvedSearchParams = await searchParams

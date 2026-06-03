@@ -4,7 +4,7 @@ import { redirect } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FcmSetup } from "@/components/notifications/fcm-setup"
-import { prisma } from "@/lib/prisma"
+import { getUserMemberships } from "@/lib/data/membership"
 import { OrgSwitcher } from "@/components/dashboard/org-switcher"
 
 export default async function DashboardLayout({
@@ -16,11 +16,7 @@ export default async function DashboardLayout({
   if (!session) redirect("/login")
 
   const memberships = session.user.activeOrgId
-    ? await prisma.membership.findMany({
-        where: { userId: session.user.id },
-        include: { org: { select: { id: true, name: true } } },
-        orderBy: { createdAt: "asc" },
-      })
+    ? await getUserMemberships(session.user.id)
     : []
 
   const activeOrg = memberships.find((m) => m.orgId === session.user.activeOrgId)?.org ?? null

@@ -73,3 +73,9 @@ export async function getUserMemberships(userId: string) {
     orderBy: { createdAt: "asc" },
   })
 }
+
+export async function getMembershipById(id: string, orgId: string): Promise<Membership | null> {
+  return prisma.membership.findUnique({
+    where: { id, orgId },
+  })
+}

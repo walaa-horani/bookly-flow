@@ -1,12 +1,10 @@
-import { auth } from "@/lib/auth"
-import { prisma } from "@/lib/prisma"
+import { requireOrgContext } from "@/lib/org-context"
+import { getBookingPage } from "@/lib/data/booking-page"
 import { BookingPageForm } from "@/components/dashboard/booking-page-form"
 
 export default async function EditBookingPage() {
-  const session = await auth()
-  const existing = await prisma.bookingPage.findUnique({
-    where: { userId: session!.user.id },
-  })
+  const ctx = await requireOrgContext()
+  const existing = await getBookingPage(ctx.orgId)
 
   return (
     <div className="space-y-6">

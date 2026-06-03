@@ -55,18 +55,14 @@ export async function POST(req: Request) {
               bookingPage: {
                 include: {
                   org: { include: { memberships: { include: { user: { include: { fcmTokens: true } } } } } },
-                  // fallback for pre-migration data
-                  user: { include: { fcmTokens: true } },
                 },
               },
             },
           })
 
-          // Fan-out to all org members' FCM tokens (or user FCM tokens if pre-migration)
-          const orgTokens = appointment.bookingPage.org?.memberships
-            .flatMap((m) => m.user.fcmTokens.map((t) => t.token)) ?? []
-          const userTokens = appointment.bookingPage.user?.fcmTokens.map((t) => t.token) ?? []
-          const tokens = Array.from(new Set([...orgTokens, ...userTokens]))
+          // Fan-out to all org members' FCM tokens
+          const tokens = appointment.bookingPage.org.memberships
+            .flatMap((m) => m.user.fcmTokens.map((t) => t.token))
 
           if (tokens.length > 0) {
             await sendBookingConfirmedNotification(tokens, {

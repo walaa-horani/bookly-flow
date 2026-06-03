@@ -15,8 +15,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Booking page not found." }, { status: 404 })
   }
 
-  // Tier comes from org (post-migration) or user (pre-migration fallback)
-  const tier = bookingPage.org?.tier ?? bookingPage.user?.tier ?? "FREE"
+  // Tier comes from organization
+  const tier = bookingPage.org.tier
 
   if (tier === "FREE") {
     const todayStart = new Date(startTime)
