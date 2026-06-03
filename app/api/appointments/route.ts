@@ -1,4 +1,7 @@
+// app/api/appointments/route.ts
+// Public endpoint — no session required. Uses lib/data/public/booking.ts (whitelisted).
 import { NextResponse } from "next/server"
+import { getActiveBookingPageBySlug } from "@/lib/data/public/booking"
 import { prisma } from "@/lib/prisma"
 
 const FREE_TIER_DAILY_LIMIT = 5
@@ -6,16 +9,16 @@ const FREE_TIER_DAILY_LIMIT = 5
 export async function POST(req: Request) {
   const { slug, clientName, clientEmail, startTime, endTime, notes } = await req.json()
 
-  const bookingPage = await prisma.bookingPage.findUnique({
-    where: { slug, isActive: true },
-    include: { user: { select: { tier: true } } },
-  })
+  const bookingPage = await getActiveBookingPageBySlug(slug)
 
   if (!bookingPage) {
     return NextResponse.json({ error: "Booking page not found." }, { status: 404 })
   }
 
-  if (bookingPage.user.tier === "FREE") {
+  // Tier comes from org (post-migration) or user (pre-migration fallback)
+  const tier = bookingPage.org?.tier ?? bookingPage.user?.tier ?? "FREE"
+
+  if (tier === "FREE") {
     const todayStart = new Date(startTime)
     todayStart.setUTCHours(0, 0, 0, 0)
     const todayEnd = new Date(startTime)
@@ -31,7 +34,7 @@ export async function POST(req: Request) {
 
     if (todayCount >= FREE_TIER_DAILY_LIMIT) {
       return NextResponse.json(
-        { error: "This provider has reached their daily booking limit." },
+        { error: "This provider isn't accepting more bookings today — please try again tomorrow." },
         { status: 429 }
       )
     }
