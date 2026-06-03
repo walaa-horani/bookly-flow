@@ -11,11 +11,6 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/login", req.url))
   }
 
-  // Coarse UX redirect — no DB call. requireOrgContext() does the authoritative check.
-  if (isAuthenticated && isDashboard && !req.auth?.user?.activeOrgId) {
-    return NextResponse.redirect(new URL("/onboarding", req.url))
-  }
-
   return NextResponse.next()
 })
 
