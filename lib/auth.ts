@@ -4,6 +4,7 @@ import Google from "next-auth/providers/google"
 import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import type { AccountType } from "@/app/generated/prisma/client"
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -36,7 +37,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     session({ session, user }) {
       session.user.id = user.id
-      session.user.tier = user.tier
+      session.user.activeOrgId = (user as { activeOrgId?: string | null }).activeOrgId ?? null
+      session.user.accountType = (user as { accountType?: string }).accountType as AccountType ?? "PROVIDER"
       return session
     },
   },

@@ -45,7 +45,7 @@ describe("cross-org isolation — data layer", () => {
   })
 
   it("updateBookingPage uses compound { id, orgId } — foreign page id returns nothing", async () => {
-    mockBookingPage.update.mockResolvedValue(null)
+    mockBookingPage.update.mockResolvedValue(null as any)
     // Org A member passes Org B's page id — compound where prevents match
     await updateBookingPage(ORG_A, PAGE_B_ID, {
       title: "Hack",
