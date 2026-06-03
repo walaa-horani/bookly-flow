@@ -4,11 +4,8 @@ import type { Organization } from "@/app/generated/prisma/client"
 
 export async function createOrg(name: string, ownerId: string): Promise<Organization> {
   const org = await prisma.organization.create({ data: { name } })
-  // array $transaction is HTTP-adapter compatible (callback form is NOT)
-  await prisma.$transaction([
-    prisma.membership.create({ data: { userId: ownerId, orgId: org.id, role: "OWNER" } }),
-    prisma.user.update({ where: { id: ownerId }, data: { activeOrgId: org.id } }),
-  ])
+  await prisma.membership.create({ data: { userId: ownerId, orgId: org.id, role: "OWNER" } })
+  await prisma.user.update({ where: { id: ownerId }, data: { activeOrgId: org.id } })
   return org
 }
 

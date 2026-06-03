@@ -90,34 +90,32 @@ export async function POST(req: Request) {
           }
 
           // Conditional update: only upgrade if this event is newer than any stored event
-          await prisma.$transaction([
-            prisma.organization.update({
-              where: { id: orgId },
-              data: {
-                tier: "PRO",
-                paddleSubscriptionId: data.id,
-              },
-            }),
-            prisma.subscription.upsert({
-              where: { orgId },
-              update: {
-                paddleSubscriptionId: data.id,
-                paddlePriceId: data.items[0]?.price?.id ?? "",
-                status: "ACTIVE",
-                currentPeriodStart: new Date(data.currentBillingPeriod?.startsAt ?? Date.now()),
-                currentPeriodEnd: new Date(data.currentBillingPeriod?.endsAt ?? Date.now()),
-                cancelAtPeriodEnd: false,
-              },
-              create: {
-                orgId,
-                paddleSubscriptionId: data.id,
-                paddlePriceId: data.items[0]?.price?.id ?? "",
-                status: "ACTIVE",
-                currentPeriodStart: new Date(data.currentBillingPeriod?.startsAt ?? Date.now()),
-                currentPeriodEnd: new Date(data.currentBillingPeriod?.endsAt ?? Date.now()),
-              },
-            }),
-          ])
+          await prisma.organization.update({
+            where: { id: orgId },
+            data: {
+              tier: "PRO",
+              paddleSubscriptionId: data.id,
+            },
+          })
+          await prisma.subscription.upsert({
+            where: { orgId },
+            update: {
+              paddleSubscriptionId: data.id,
+              paddlePriceId: data.items[0]?.price?.id ?? "",
+              status: "ACTIVE",
+              currentPeriodStart: new Date(data.currentBillingPeriod?.startsAt ?? Date.now()),
+              currentPeriodEnd: new Date(data.currentBillingPeriod?.endsAt ?? Date.now()),
+              cancelAtPeriodEnd: false,
+            },
+            create: {
+              orgId,
+              paddleSubscriptionId: data.id,
+              paddlePriceId: data.items[0]?.price?.id ?? "",
+              status: "ACTIVE",
+              currentPeriodStart: new Date(data.currentBillingPeriod?.startsAt ?? Date.now()),
+              currentPeriodEnd: new Date(data.currentBillingPeriod?.endsAt ?? Date.now()),
+            },
+          })
           console.log("[webhook] upgraded org", orgId, "to PRO")
         }
         break
@@ -129,16 +127,14 @@ export async function POST(req: Request) {
           where: { paddleSubscriptionId: data.id },
         })
         if (sub?.orgId) {
-          await prisma.$transaction([
-            prisma.subscription.update({
-              where: { paddleSubscriptionId: data.id },
-              data: { status: "CANCELED" },
-            }),
-            prisma.organization.update({
-              where: { id: sub.orgId },
-              data: { tier: "FREE" },
-            }),
-          ])
+          await prisma.subscription.update({
+            where: { paddleSubscriptionId: data.id },
+            data: { status: "CANCELED" },
+          })
+          await prisma.organization.update({
+            where: { id: sub.orgId },
+            data: { tier: "FREE" },
+          })
         }
         break
       }

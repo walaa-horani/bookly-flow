@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const slots: { dayOfWeek: number; startTime: string; endTime: string; isActive: boolean }[] =
     await req.json()
 
-  await prisma.$transaction(
+  await Promise.all(
     slots.map((s) =>
       prisma.availability.upsert({
         where: { bookingPageId_dayOfWeek: { bookingPageId: page.id, dayOfWeek: s.dayOfWeek } },

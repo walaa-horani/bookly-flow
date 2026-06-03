@@ -50,10 +50,8 @@ export async function joinByToken(
     return { orgId: org.id, alreadyMember: true }
   }
 
-  await prisma.$transaction([
-    prisma.membership.create({ data: { userId, orgId: org.id, role: "MEMBER" } }),
-    prisma.user.update({ where: { id: userId }, data: { activeOrgId: org.id } }),
-  ])
+  await prisma.membership.create({ data: { userId, orgId: org.id, role: "MEMBER" } })
+  await prisma.user.update({ where: { id: userId }, data: { activeOrgId: org.id } })
   return { orgId: org.id, alreadyMember: false }
 }
 
