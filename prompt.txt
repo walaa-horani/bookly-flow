@@ -1,0 +1,44 @@
+You are an expert Full-Stack Developer specialized in Next.js 16, TypeScript, Prisma, and SaaS scalable architecture. Your goal is to build the core production-ready foundation of an Appointment Booking SaaS called "BooklyFlow"....
+
+
+Technical Stack Constraints (Strict)
+Framework: Next.js 16+ (App Router).
+
+Database: PostgreSQL hosted on Neon DB.
+
+ORM: Prisma to manage database operations.
+
+Authentication: NextAuth.js (Auth.js, google/email/password) using the Prisma Adapter.
+
+Payments: Paddle (Sandbox mode) handling two distinct checkout flows (Subscriptions & One-time payments).
+
+Notifications: Firebase Cloud Messaging (FCM) for real-time Web Push Notifications.
+
+UI/Styling: Tailwind CSS with Shadcn UI components.
+
+-------------------------------
+Core User Roles & Business Logic
+Provider (The SaaS Customer):
+
+
+Can create a public booking page, set daily/weekly time slots, and manage appointments.
+
+Free Tier: Can receive up to 5 bookings per day.
+
+Pro Tier ($10/mo): Unlimited bookings and custom branding.
+
+Client (The End-User):
+
+Visits the Provider's public page, selects a time slot, and books an appointment.
+
+If the Provider charges for the session, the Client must pay immediately during checkout.
+
+------------------------------------
+
+You must implement two types of payments using  Paddle :
+
+SaaS Subscription (B2B): Handles recurring billing for Providers upgrading from Free to Pro.
+
+Pay-on-Booking (B2C): Handles one-time payments from Clients booking a paid session...
+
+
