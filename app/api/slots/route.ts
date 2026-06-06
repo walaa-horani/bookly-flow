@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { generateSlots } from "@/lib/slots"
-import { getBookingPageWithDayAvailability } from "@/lib/data/public/booking"
+import { getBookingPageForSlots } from "@/lib/data/public/booking"
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -15,7 +14,10 @@ export async function GET(req: Request) {
   const date = new Date(dateParam + "T00:00:00.000Z")
   const dayOfWeek = date.getUTCDay()
 
-  const bookingPage = await getBookingPageWithDayAvailability(slug, dayOfWeek)
+  const dayStart = new Date(dateParam + "T00:00:00.000Z")
+  const dayEnd = new Date(dateParam + "T23:59:59.999Z")
+
+  const bookingPage = await getBookingPageForSlots(slug, dayOfWeek, dayStart, dayEnd)
 
   if (!bookingPage) {
     return NextResponse.json({ error: "Booking page not found" }, { status: 404 })
@@ -26,17 +28,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ slots: [] })
   }
 
-  const dayStart = new Date(dateParam + "T00:00:00.000Z")
-  const dayEnd = new Date(dateParam + "T23:59:59.999Z")
-
-  const existing = await prisma.appointment.findMany({
-    where: {
-      bookingPageId: bookingPage.id,
-      status: { in: ["PENDING", "CONFIRMED"] },
-      startTime: { gte: dayStart, lte: dayEnd },
-    },
-    select: { startTime: true, endTime: true },
-  })
+  const existing = bookingPage.appointments
 
   const slots = generateSlots({
     date,

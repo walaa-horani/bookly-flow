@@ -8,6 +8,7 @@ describe("generateSlots", () => {
       availability: { startTime: "09:00", endTime: "10:00", dayOfWeek: 1, isActive: true },
       durationMinutes: 30,
       existingAppointments: [],
+      now: new Date("2026-06-01T00:00:00.000Z"),
     })
 
     expect(slots).toHaveLength(2)
@@ -27,6 +28,7 @@ describe("generateSlots", () => {
       availability: { startTime: "09:00", endTime: "10:00", dayOfWeek: 1, isActive: true },
       durationMinutes: 30,
       existingAppointments: [{ startTime: existingStart, endTime: existingEnd }],
+      now: new Date("2026-06-01T00:00:00.000Z"),
     })
 
     expect(slots).toHaveLength(1)

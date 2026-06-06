@@ -95,9 +95,10 @@ model Organization {
   paddleCustomerId     String?
   paddleSubscriptionId String?
 
-  memberships  Membership[]
-  bookingPage  BookingPage?  @relation("OrgBookingPage")
-  subscription Subscription? @relation("OrgSubscription")
+  memberships   Membership[]
+  bookingPage   BookingPage?      @relation("OrgBookingPage")
+  subscription  Subscription?     @relation("OrgSubscription")
+  notifications OrgNotification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -182,6 +183,7 @@ model Appointment {
 
   paddleTransactionId String?
   amountPaid          Decimal? @db.Decimal(10, 2)
+  reminderSentAt      DateTime?
 
   bookingPage BookingPage @relation(fields: [bookingPageId], references: [id], onDelete: Cascade)
 
@@ -238,6 +240,23 @@ model WebhookEvent {
   processedAt DateTime @default(now())
 
   @@map("webhook_events")
+}
+
+// ─── In-app notifications (org-scoped) ───────────────────────────────────────
+
+model OrgNotification {
+  id        String   @id @default(cuid())
+  orgId     String
+  type      String   @default("NEW_BOOKING")
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("org_notifications")
 }
 
 // ─── Firebase Cloud Messaging tokens ─────────────────────────────────────────

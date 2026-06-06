@@ -20,7 +20,7 @@ export async function requireOrgContext(): Promise<OrgContext> {
   const session = await auth()
   if (!session) redirect("/login")
 
-  if (session.user.accountType !== "PROVIDER") redirect("/login")
+  if (session.user.accountType !== "PROVIDER") redirect("/")
 
   const activeOrgId = session.user.activeOrgId
   if (!activeOrgId) redirect("/onboarding")

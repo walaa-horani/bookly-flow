@@ -33,7 +33,15 @@ export function LoginForm() {
       return
     }
 
-    router.push("/dashboard")
+    // Retrieve active session to determine user role
+    const sessionRes = await fetch("/api/auth/session")
+    const session = await sessionRes.json().catch(() => null)
+    
+    if (session?.user?.accountType === "CLIENT") {
+      window.location.href = "/"
+    } else {
+      window.location.href = "/dashboard"
+    }
   }
 
   async function handleGoogle() {

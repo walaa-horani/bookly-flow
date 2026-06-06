@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server"
 import { paddle } from "@/lib/paddle"
 import { prisma } from "@/lib/prisma"
-import { sendBookingConfirmedNotification } from "@/lib/firebase-admin"
 import type {
   EventName,
   SubscriptionActivatedEvent,
@@ -48,28 +47,12 @@ export async function POST(req: Request) {
             ? Number(data.details.totals.total) / 100
             : null
 
-          const appointment = await prisma.appointment.update({
+          // The provider was already notified when the booking was created
+          // (app/api/appointments). Here we only finalize payment state.
+          await prisma.appointment.update({
             where: { id: customData.appointmentId },
             data: { status: "CONFIRMED", paddleTransactionId: data.id, amountPaid: amount },
-            include: {
-              bookingPage: {
-                include: {
-                  org: { include: { memberships: { include: { user: { include: { fcmTokens: true } } } } } },
-                },
-              },
-            },
           })
-
-          // Fan-out to all org members' FCM tokens
-          const tokens = appointment.bookingPage.org.memberships
-            .flatMap((m) => m.user.fcmTokens.map((t) => t.token))
-
-          if (tokens.length > 0) {
-            await sendBookingConfirmedNotification(tokens, {
-              clientName: appointment.clientName,
-              startTime: appointment.startTime.toISOString(),
-            })
-          }
         }
         break
       }

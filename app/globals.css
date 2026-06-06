@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0..1,0");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -7,9 +8,31 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-roboto);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-roboto);
+  
+  --color-primary: #bc0100;
+  --color-primary-hover: #CC0000;
+  --color-secondary: #0056c3;
+  --color-text-primary: #0F0F0F;
+  --color-neutral-gray: #606060;
+  --color-border-light: #E5E5E5;
+  --color-search-btn-bg: #F8F8F8;
+  --color-surface: #F2F2F2;
+  --color-surface-bright: #fff8f6;
+  --color-surface-container: #ffe9e6;
+  --color-surface-container-high: #ffe2dd;
+  --color-surface-container-highest: #ffdad4;
+  --color-surface-container-low: #fff0ee;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-dim: #f8d1cb;
+  --color-outline: #956d67;
+  --color-outline-variant: #ebbbb4;
+  --color-success: #2BA640;
+  --color-warning: #FB8C00;
+  --color-error: #ba1a1a;
+  
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -32,20 +55,20 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 9999px;
+  --radius-full: 9999px;
+  
 }
 
 :root {
@@ -127,4 +150,20 @@
   html {
     @apply font-sans;
   }
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined' !important;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
 }

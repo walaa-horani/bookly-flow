@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useCallback } from "react"
-import { getToken } from "firebase/messaging"
+import { getToken, onMessage } from "firebase/messaging"
 import { getFirebaseMessaging } from "@/lib/firebase-client"
 
 export function useFcm() {
@@ -27,12 +27,21 @@ export function useFcm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       })
+
+      // Foreground messages don't trigger the service worker's
+      // onBackgroundMessage, so show them here while the tab is focused.
+      onMessage(messaging, (payload) => {
+        const { title, body } = payload.notification ?? {}
+        if (title && Notification.permission === "granted") {
+          new Notification(title, { body: body ?? "", icon: "/favicon.ico" })
+        }
+        // Signal the notification bell to refetch immediately.
+        window.dispatchEvent(new CustomEvent("fcm-message", { detail: payload }))
+      })
     } catch (err) {
       console.error("FCM registration failed:", err)
     }
   }, [])
 
-  useEffect(() => {
-    registerToken()
-  }, [registerToken])
+  return { registerToken }
 }

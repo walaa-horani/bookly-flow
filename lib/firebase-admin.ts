@@ -18,7 +18,7 @@ if (!admin.apps.length) {
 
 export const fcmAdmin = admin.messaging()
 
-export async function sendBookingConfirmedNotification(
+export async function sendNewBookingNotification(
   tokens: string[],
   data: { clientName: string; startTime: string }
 ) {
@@ -31,7 +31,7 @@ export async function sendBookingConfirmedNotification(
   const message: admin.messaging.MulticastMessage = {
     tokens,
     notification: {
-      title: "New Booking Confirmed!",
+      title: "New Booking!",
       body: `${data.clientName} booked at ${timeStr} on ${dateStr}`,
     },
     webpush: {

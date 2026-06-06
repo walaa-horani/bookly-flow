@@ -7,7 +7,9 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { token } = await req.json()
-  if (!token) return NextResponse.json({ error: "Token required" }, { status: 400 })
+  if (!token || typeof token !== "string" || token.length < 10 || token.length > 500) {
+    return NextResponse.json({ error: "Token required" }, { status: 400 })
+  }
 
   const ua = req.headers.get("user-agent") ?? undefined
 

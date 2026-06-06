@@ -39,11 +39,11 @@ describe("requireOrgContext", () => {
     await expect(requireOrgContext()).rejects.toThrow("REDIRECT:/login")
   })
 
-  it("redirects to /login when accountType is CLIENT", async () => {
+  it("redirects to / when accountType is CLIENT", async () => {
     mockAuth.mockResolvedValue({
       user: { id: "u1", activeOrgId: "org1", accountType: "CLIENT" },
     })
-    await expect(requireOrgContext()).rejects.toThrow("REDIRECT:/login")
+    await expect(requireOrgContext()).rejects.toThrow("REDIRECT:/")
   })
 
   it("redirects to /onboarding when no activeOrgId", async () => {

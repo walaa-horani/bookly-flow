@@ -16,7 +16,23 @@ export async function createBookingPage(
     currency?: string
   }
 ) {
-  return prisma.bookingPage.create({ data: { orgId, ...data } })
+  const page = await prisma.bookingPage.create({ data: { orgId, ...data } })
+
+  const availabilityData = Array.from({ length: 7 }, (_, i) => ({
+    bookingPageId: page.id,
+    dayOfWeek: i,
+    startTime: "09:00",
+    endTime: "17:00",
+    isActive: i >= 1 && i <= 5,
+  }))
+
+  await Promise.all(
+    availabilityData.map((slot) =>
+      prisma.availability.create({ data: slot })
+    )
+  )
+
+  return page
 }
 
 export async function updateBookingPage(

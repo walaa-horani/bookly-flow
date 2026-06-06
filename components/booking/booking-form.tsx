@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,11 +18,19 @@ type Props = {
 }
 
 export function BookingForm({ slot, slug, price, currency, onBack }: Props) {
+  const { data: session } = useSession()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [notes, setNotes] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (session?.user) {
+      if (session.user.name) setName(session.user.name)
+      if (session.user.email) setEmail(session.user.email)
+    }
+  }, [session])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -47,19 +56,6 @@ export function BookingForm({ slot, slug, price, currency, onBack }: Props) {
     if (!res.ok) {
       setError(data.error ?? "Booking failed.")
       return
-    }
-
-    if (price) {
-      const checkoutRes = await fetch("/api/paddle/booking-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ appointmentId: data.id }),
-      })
-      const checkoutData = await checkoutRes.json()
-      if (checkoutData.checkoutUrl) {
-        window.location.href = checkoutData.checkoutUrl
-        return
-      }
     }
 
     window.location.href = `/book/${slug}/confirmed?appt=${data.id}`
@@ -111,7 +107,7 @@ export function BookingForm({ slot, slug, price, currency, onBack }: Props) {
             ← Back
           </Button>
           <Button type="submit" disabled={loading}>
-            {loading ? "Booking…" : price ? "Pay & Book" : "Confirm Booking"}
+            {loading ? "Booking…" : "Confirm Booking"}
           </Button>
         </div>
       </form>

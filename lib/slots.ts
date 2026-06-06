@@ -15,6 +15,7 @@ type SlotInput = {
   availability: AvailabilityInput
   durationMinutes: number
   existingAppointments: AppointmentInput[]
+  now?: Date
 }
 
 export type TimeSlot = {
@@ -38,6 +39,7 @@ export function generateSlots({
   availability,
   durationMinutes,
   existingAppointments,
+  now = new Date(),
 }: SlotInput): TimeSlot[] {
   if (!availability.isActive) return []
 
@@ -51,9 +53,10 @@ export function generateSlots({
   while (cursor + durationMs <= windowEnd.getTime()) {
     const start = new Date(cursor)
     const end = new Date(cursor + durationMs)
-
+    const isPast = start.getTime() < now.getTime()
     const blocked = existingAppointments.some((a) => overlaps(start, end, a))
-    if (!blocked) {
+    
+    if (!blocked && !isPast) {
       slots.push({ start, end })
     }
 
