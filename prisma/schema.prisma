@@ -1,6 +1,4 @@
 // prisma/schema.prisma
-// Connection URL is managed via prisma.config.ts (Prisma 7 pattern)
-
 generator client {
   provider = "prisma-client"
   output   = "../app/generated/prisma"
@@ -55,19 +53,20 @@ model VerificationToken {
 // ─── Provider (SaaS customer) ─────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   name          String?
-  email         String    @unique
+  email         String      @unique
   emailVerified DateTime?
   image         String?
-  password      String?   // bcrypt hash; null for OAuth-only accounts
+  password      String?
 
-  tier Tier @default(FREE)
+  // new org fields
+  accountType AccountType @default(PROVIDER)
+  activeOrgId String?
 
   accounts     Account[]
   sessions     Session[]
-  bookingPage  BookingPage?
-  subscription Subscription?
+  memberships  Membership[]
   fcmTokens    FcmToken[]
 
   createdAt DateTime @default(now())
@@ -76,29 +75,75 @@ model User {
   @@map("users")
 }
 
+enum AccountType {
+  PROVIDER
+  CLIENT
+}
+
+enum Role {
+  OWNER
+  MEMBER
+}
+
+// ─── Organization ─────────────────────────────────────────────────────────────
+
+model Organization {
+  id                   String  @id @default(cuid())
+  name                 String
+  tier                 Tier    @default(FREE)
+  inviteToken          String  @unique @default(cuid())
+  paddleCustomerId     String?
+  paddleSubscriptionId String?
+
+  memberships   Membership[]
+  bookingPage   BookingPage?      @relation("OrgBookingPage")
+  subscription  Subscription?     @relation("OrgSubscription")
+  notifications OrgNotification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("organizations")
+}
+
 enum Tier {
   FREE
   PRO
 }
 
-// ─── Booking page (one per Provider) ─────────────────────────────────────────
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  orgId  String
+  role   Role   @default(MEMBER)
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, orgId])
+  @@index([orgId])
+  @@map("memberships")
+}
+
+// ─── Booking page ─────────────────────────────────────────────────────────────
 
 model BookingPage {
   id          String   @id @default(cuid())
-  userId      String   @unique
-  slug        String   @unique   // URL-safe: /book/<slug>
+  orgId       String   @unique
+  slug        String   @unique
   title       String
   description String?  @db.Text
-  duration    Int      @default(30) // minutes per slot
-  price       Decimal? @db.Decimal(10, 2) // null = free session
+  duration    Int      @default(30)
+  price       Decimal? @db.Decimal(10, 2)
   currency    String   @default("USD")
   isActive    Boolean  @default(true)
+  brandColor  String?
+  logoUrl     String?
 
-  // Pro-tier branding (rendered only when tier === PRO)
-  brandColor String?
-  logoUrl    String?
-
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org          Organization @relation("OrgBookingPage", fields: [orgId], references: [id], onDelete: Cascade)
   availability Availability[]
   appointments Appointment[]
 
@@ -113,9 +158,9 @@ model BookingPage {
 model Availability {
   id            String  @id @default(cuid())
   bookingPageId String
-  dayOfWeek     Int     // 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
-  startTime     String  // "09:00" 24-hour
-  endTime       String  // "17:00" 24-hour
+  dayOfWeek     Int
+  startTime     String
+  endTime       String
   isActive      Boolean @default(true)
 
   bookingPage BookingPage @relation(fields: [bookingPageId], references: [id], onDelete: Cascade)
@@ -124,7 +169,7 @@ model Availability {
   @@map("availability")
 }
 
-// ─── Appointment (one booking by a Client) ───────────────────────────────────
+// ─── Appointment ─────────────────────────────────────────────────────────────
 
 model Appointment {
   id            String            @id @default(cuid())
@@ -136,9 +181,9 @@ model Appointment {
   status        AppointmentStatus @default(PENDING)
   notes         String?           @db.Text
 
-  // Populated by Paddle webhook after successful B2C payment
   paddleTransactionId String?
   amountPaid          Decimal? @db.Decimal(10, 2)
+  reminderSentAt      DateTime?
 
   bookingPage BookingPage @relation(fields: [bookingPageId], references: [id], onDelete: Cascade)
 
@@ -151,18 +196,18 @@ model Appointment {
 }
 
 enum AppointmentStatus {
-  PENDING    // awaiting payment (paid session) or just created (free session, auto-confirmed)
-  CONFIRMED  // payment received OR free session auto-confirmed
+  PENDING
+  CONFIRMED
   CANCELLED
   COMPLETED
   NO_SHOW
 }
 
-// ─── Paddle B2B subscription (Provider → Pro) ────────────────────────────────
+// ─── Paddle subscription ──────────────────────────────────────────────────────
 
 model Subscription {
   id                   String             @id @default(cuid())
-  userId               String             @unique
+  orgId                String             @unique
   paddleSubscriptionId String             @unique
   paddlePriceId        String
   status               SubscriptionStatus
@@ -170,7 +215,7 @@ model Subscription {
   currentPeriodEnd     DateTime
   cancelAtPeriodEnd    Boolean            @default(false)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org Organization @relation("OrgSubscription", fields: [orgId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -184,6 +229,34 @@ enum SubscriptionStatus {
   CANCELED
   TRIALING
   PAUSED
+}
+
+// ─── Webhook idempotency ──────────────────────────────────────────────────────
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  eventId     String   @unique
+  occurredAt  DateTime
+  processedAt DateTime @default(now())
+
+  @@map("webhook_events")
+}
+
+// ─── In-app notifications (org-scoped) ───────────────────────────────────────
+
+model OrgNotification {
+  id        String   @id @default(cuid())
+  orgId     String
+  type      String   @default("NEW_BOOKING")
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, createdAt(sort: Desc)])
+  @@map("org_notifications")
 }
 
 // ─── Firebase Cloud Messaging tokens ─────────────────────────────────────────

@@ -51,7 +51,7 @@ export function BookingPageForm({ existing }: Props) {
       return
     }
 
-    router.push("/dashboard/booking-page")
+    router.push("/booking-page")
     router.refresh()
   }
 

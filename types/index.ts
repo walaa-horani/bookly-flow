@@ -1,15 +1,17 @@
 import type { DefaultSession } from "next-auth"
-import type { Tier } from "@/app/generated/prisma/client"
+import type { AccountType } from "@/app/generated/prisma/client"
 
 declare module "next-auth" {
   interface Session {
     user: {
       id: string
-      tier: Tier
+      activeOrgId: string | null
+      accountType: AccountType
     } & DefaultSession["user"]
   }
 
   interface User {
-    tier: Tier
+    accountType: AccountType
+    activeOrgId: string | null
   }
 }
